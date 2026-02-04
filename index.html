@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vocabulary Tester</title>
+  <style>
+    html, body {
+      height: 150%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #ffffff;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px 0;
+      min-height: 200%;
+    }
+
+    .container {
+      background: #1e1e1e;
+      padding: 25px;
+      border-radius: 12px;
+      width: 400px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+
+    input, textarea, button, select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+    }
+
+    textarea { height: 120px; }
+
+    button {
+      background: #4caf50;
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #555;
+    }
+
+    .choice {
+      background: #333;
+    }
+
+    .choice:hover {
+      background: #444;
+    }
+
+    .word {
+      font-size: 22px;
+      margin: 15px 0;
+    }
+
+    .hidden { display: none; }
+
+    #allAnswers { text-align: left; margin-top: 15px; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Vocabulary Tester</h1>
+
+    <div id="setup">
+      <p><strong>Choose Chapter</strong></p>
+      <select id="chapterSelect" onchange="loadChapter()">
+        <option value="1">Chapter 1</option>
+        <option value="2">Chapter 2</option>
+        <option value="3">Chapter 3</option>
+        <option value="4">Chapter 4</option>
+      </select>
+
+      <p><strong>Mode</strong></p>
+      <select id="modeSelect">
+        <option value="mc" selected>Multiple choice</option>
+        <option value="type">Type in</option>
+      </select>
+
+      <button onclick="startTest()">Start Test</button>
+      <div id="setupError" style="color:#f44336;"></div>
+      <button class="secondary" onclick="showAllAnswers()">Show All Answers</button>
+    </div>
+
+    <div id="quiz" class="hidden">
+      <div id="score">Score: 0 / 0</div>
+      <div class="word" id="currentWord"></div>
+      <input type="text" id="answer" placeholder="Type in">
+      <div id="choices" class="hidden"></div>
+      <button id="submitBtn" onclick="checkAnswer()">Submit</button>
+      <div id="result"></div>
+      <button class="secondary" onclick="endTest()">Finish Test</button>
+    </div>
+
+    <div id="allAnswers" class="hidden"></div>
+
+    <div id="summary" class="hidden">
+      <h2>Test Complete</h2>
+      <p id="finalScore"></p>
+      <button onclick="resetTest()">Edit Words / Restart</button>
+    </div>
+  </div>
+
+  <script>
+    function normalize(str) {
+      return str.toLowerCase().replace(/[.,!?;:]/g,'').trim();
+    }
+
+    const chapters = {
+      '1': ['amō=love, like','dea=goddess','deus=god','et=and, even','etiam=also, even','fēmina=woman','fīlia=daughter','fīlius=son','homō=man, human being','īrātus=angry','lacrimō=weep, cry','laetus=happy','laudō=praise','līberī=children','māter=mother','multus=much, many','pater=father','pulcher=beautiful, handsome','pūniō=punish','rēgīna=queen','regō=rule','rēx=king','saepe=often','saevus=savage, cruel','sed=but','sum=be','terreō=frighten, terrify','tum=then','uxor=wife'],
+      '2': ['ad=to, towards, at','arma=arms, weapons','audāx=bold, daring','bellum=war','capiō=take, catch, capture, make (a plan)','contrā=against','corpus=body','currō=run','eō=go','flūmen=river','fortis=brave, strong','fortiter=bravely, strongly','gladius=sword','Graecus=Greek','hasta=spear','iaciō=throw','in=into, onto','ingēns=huge','inquit=he/she says/said, they say/said','interficiō=kill','maneō=remain, stay','nōn=not','per=through, along','perīculum=danger','prope=near','sagitta=arrow','silva=wood','timeō=fear, be afraid','trāns=across','vincō=conquer, win, be victorious, defeat'],
+      '3': ['ā, ab=from, away from, by','ascendō=climb','audiō=hear, listen to','auxilium=help','bonus=good','caelum=sky, heaven','celeriter=quickly','cōnspiciō=catch sight of, notice','cum=with','dē=from, down from, about','dēscendō=go down, come down','difficilis=difficult','diū=for a long time','ē, ex=from, out of, out from','equus=horse','facilis=easy','fēlīx=fortunate, happy, lucky','in=in, on','iubeō=order','magnus=big, large, great','malus=evil, bad','mare=sea','mōns=mountain','ōlim=once, some time ago','petō=make for, seek, beg/ask for','possum=can, be able','pugnō=fight','subitō=suddenly','tandem=at last, finally','terra=ground, land, country'],
+      '4': ['-ne=(introduces question)','aedificō=build','ager=field','aurum=gold','crēdō=believe, trust','crūdēlis=cruel','cūr?=why?','dō=give','dōnum=gift, present','faciō=make, do','ferō=bring, carry, bear','habeō=have, hold','īra=anger','miser=miserable, wretched, sad','nōlō=not want, refuse','nōmen=name','nōnne …?=surely ... ?','num ... ?=surely … not?','pecūnia=money','persuādeō=persuade','perterritus=terrified','pōnō=put, place, set up','quandō?=when?','quod=because','semper=always','tamen=however','templum=temple','trīstis=sad','ubi?=where?','volō=want, wish, be willing']
+    };
+
+    let words = [];
+    let current = {};
+    let score = 0;
+    let total = 0;
+    let mode = 'mc';
+
+    function loadChapter() {
+      const chapter = document.getElementById('chapterSelect').value;
+      if (!chapters[chapter]) {
+        document.getElementById('setupError').textContent = 'Chapter not found!';
+        words = [];
+        return;
+      }
+      words = chapters[chapter].map(line => {
+        const parts = line.split('=');
+        const defs = parts[1].replace(/[\/]/g, ',').split(',').map(d => normalize(d));
+        return { word: parts[0].trim(), definitions: defs };
+      });
+      document.getElementById('allAnswers').classList.add('hidden');
+      document.getElementById('allAnswers').innerHTML = '';
+    }
+
+    function showAllAnswers() {
+      const chapter = document.getElementById('chapterSelect').value;
+      if (!chapters[chapter]) return;
+      const container = document.getElementById('allAnswers');
+      container.innerHTML = chapters[chapter].map(line => line.replace('/', ',')).join('<br>');
+      container.classList.remove('hidden');
+      container.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.addEventListener('keydown', e => {
+      if (!document.getElementById('quiz') || document.getElementById('quiz').classList.contains('hidden')) return;
+      if (mode === 'type' && e.key === 'Enter') { e.preventDefault(); checkAnswer(); }
+      if (mode === 'mc' && ['1','2','3','4'].includes(e.key)) {
+        const idx = parseInt(e.key, 10) - 1;
+        const buttons = document.querySelectorAll('#choices button');
+        if (buttons[idx]) buttons[idx].click();
+      }
+    });
+
+    function startTest() {
+      if (words.length === 0) loadChapter();
+      mode = document.getElementById('modeSelect').value;
+      score = 0; total = 0;
+      document.getElementById('score').textContent = 'Score: 0 / 0';
+      document.getElementById('setup').classList.add('hidden');
+      document.getElementById('quiz').classList.remove('hidden');
+      nextWord();
+    }
+
+    function nextWord() {
+      current = words[Math.floor(Math.random() * words.length)];
+      document.getElementById('currentWord').textContent = current.word;
+      document.getElementById('answer').value = '';
+      document.getElementById('result').textContent = '';
+      document.getElementById('choices').innerHTML = '';
+
+      if (mode === 'mc') {
+        document.getElementById('answer').classList.add('hidden');
+        document.getElementById('choices').classList.remove('hidden');
+        document.getElementById('submitBtn').classList.add('hidden');
+        createChoices();
+      } else {
+        document.getElementById('answer').classList.remove('hidden');
+        document.getElementById('choices').classList.add('hidden');
+        document.getElementById('submitBtn').classList.remove('hidden');
+        document.getElementById('answer').focus();
+      }
+    }
+
+    function createChoices() {
+      const defs = words.flatMap(w => w.definitions);
+      const options = [current.definitions[0]];
+      while (options.length < 4 && defs.length > options.length) {
+        const d = defs[Math.floor(Math.random() * defs.length)];
+        if (!options.includes(d)) options.push(d);
+      }
+      options.sort(() => Math.random() - 0.5);
+      options.forEach((opt,i) => {
+        const btn = document.createElement('button');
+        btn.textContent = `${i+1}. ${opt}`;
+        btn.className = 'choice';
+        btn.onclick = () => checkAnswer(opt);
+        document.getElementById('choices').appendChild(btn);
+      });
+    }
+
+    function checkAnswer(selected) {
+      let userAnswer = selected;
+      if (mode === 'type') {
+        userAnswer = normalize(document.getElementById('answer').value);
+        if (!userAnswer) return;
+      }
+      total++;
+      const correct = current.definitions.some(def => normalize(userAnswer) === normalize(def) || normalize(userAnswer).includes(normalize(def)) || normalize(def).includes(normalize(userAnswer)));
+      if ((mode==='mc' && current.definitions.includes(userAnswer)) || (mode==='type' && correct)) {
+        score++;
+        document.getElementById('result').textContent = '✅ Correct!';
+      } else {
+        document.getElementById('result').textContent = '❌ Incorrect. Correct answer(s): ' + current.definitions.join(', ');
+      }
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+      setTimeout(nextWord, 1200);
+    }
+
+    function endTest() {
+      document.getElementById('quiz').classList.add('hidden');
+      document.getElementById('summary').classList.remove('hidden');
+      document.getElementById('finalScore').textContent = `You scored ${score} out of ${total}`;
+    }
+
+    function resetTest() {
+      document.getElementById('summary').classList.add('hidden');
+      document.getElementById('setup').classList.remove('hidden');
+      document.getElementById('allAnswers').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
+Add initial index.html
