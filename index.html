@@ -113,7 +113,7 @@
 
   <script>
     function normalize(str) {
-      return str.toLowerCase().replace(/[.,!?;:]/g,'').trim();
+      return str.toLowerCase().replace(/[.,!?;:-_=+'"@#$%^&*]/g,'').trim();
     }
 
     const chapters = {
